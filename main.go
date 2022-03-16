@@ -88,32 +88,29 @@ func deletePerson(res *fiber.Ctx) error {
 	return res.Status(200).Send(response)
 }
 
-func createAssignment(res *fiber.Ctx) error {
+func createPerson(res *fiber.Ctx) error {
 	collection, err := getMongoDbCollection(dbname, "Assignment")
 	if err != nil {
-		return res.Status(400).SendString("There is some problem! Please Try Again !")
+		return res.Status(400).SendString("There is some problem")
 	}
-	var newAssignment Assignment
+	var newAssignment Assigment
 	json.Unmarshal([]byte(res.Body()), &newAssignment)
 	personCollection, err := getMongoDbCollection(dbname, collectionName)
 
 	if err != nil {
-		return res.Status(400).SendString("There is some error! Try again later")
+		return res.Status(400).SendString("There is some problem")
 	}
 
-	id := res.Params("id")
+	id := res.Params(("id"))
 	newAssignment.Person = id
 
 	objId, _ := primitive.ObjectIDFromHex(id)
 	curr, _ := collection.InsertOne(context.Background(), newAssignment)
 
-	var filter bson.M = bson.M{
-		"_id": objId,
-	}
-
+	var filter bson.M = bson.M{"_id": objId}
 	var temp Person
 	personCollection.FindOne(context.Background(), filter).Decode(&temp)
-	temp.Assignments = append(temp.Assignments, curr.InsertedID.(primitive.ObjectID).Hex())
+	temp.Assigment = append(temp.Assigment, curr.InsertedID.(primitive.ObjectID).Hex())
 	update := bson.M{
 		"$set": temp,
 	}
@@ -122,10 +119,10 @@ func createAssignment(res *fiber.Ctx) error {
 	return res.Status(200).Send(response)
 }
 
-func getAssignments(res *fiber.Ctx) error {
+func getPersonAssignments(res *fiber.Ctx) error {
 	collection, err := getMongoDbCollection(dbname, "Assignment")
 	if err != nil {
-		return res.Status(400).SendString("There is some problem! Please Try Again !")
+		return res.Status(400).SendString("There is some problem !")
 	}
 	id := res.Params("id")
 	var filter bson.M = bson.M{
@@ -133,7 +130,7 @@ func getAssignments(res *fiber.Ctx) error {
 	}
 	curr, err := collection.Find(context.Background(), filter)
 	if err != nil {
-		return res.Status(400).SendString("There is some problem! Please Try Again !")
+		return res.Status(400).SendString("There is some problem !")
 	}
 	defer curr.Close(context.Background())
 	var result []bson.M
@@ -149,7 +146,7 @@ func main() {
 	app.Post("/create", addPerson)
 	app.Put("/update/:id", updatePerson)
 	app.Delete("/delete/:id", deletePerson)
-	app.Post("/assignment/:id", createAssignment)
-	app.Get("/assignments/:id", getAssignments)
+	app.Post("/assignment/:id", createPerson)
+	app.Get("/assignments/:id", getPersonAssignments)
 	app.Listen(":8000")
 }
