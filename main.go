@@ -88,11 +88,68 @@ func deletePerson(res *fiber.Ctx) error {
 	return res.Status(200).Send(response)
 }
 
+func createAssignment(res *fiber.Ctx) error {
+	collection, err := getMongoDbCollection(dbname, "Assignment")
+	if err != nil {
+		return res.Status(400).SendString("There is some problem! Please Try Again !")
+	}
+	var newAssignment Assignment
+	json.Unmarshal([]byte(res.Body()), &newAssignment)
+	personCollection, err := getMongoDbCollection(dbname, collectionName)
+
+	if err != nil {
+		return res.Status(400).SendString("There is some error! Try again later")
+	}
+
+	id := res.Params("id")
+	newAssignment.Person = id
+
+	objId, _ := primitive.ObjectIDFromHex(id)
+	curr, _ := collection.InsertOne(context.Background(), newAssignment)
+
+	var filter bson.M = bson.M{
+		"_id": objId,
+	}
+
+	var temp Person
+	personCollection.FindOne(context.Background(), filter).Decode(&temp)
+	temp.Assignments = append(temp.Assignments, curr.InsertedID.(primitive.ObjectID).Hex())
+	update := bson.M{
+		"$set": temp,
+	}
+	result, _ := personCollection.UpdateOne(context.Background(), filter, update)
+	response, _ := json.Marshal(result)
+	return res.Status(200).Send(response)
+}
+
+func getAssignments(res *fiber.Ctx) error {
+	collection, err := getMongoDbCollection(dbname, "Assignment")
+	if err != nil {
+		return res.Status(400).SendString("There is some problem! Please Try Again !")
+	}
+	id := res.Params("id")
+	var filter bson.M = bson.M{
+		"person": id,
+	}
+	curr, err := collection.Find(context.Background(), filter)
+	if err != nil {
+		return res.Status(400).SendString("There is some problem! Please Try Again !")
+	}
+	defer curr.Close(context.Background())
+	var result []bson.M
+	curr.All(context.Background(), &result)
+
+	json, _ := json.Marshal(result)
+	return res.Status(200).Send(json)
+}
+
 func main() {
 	app := fiber.New()
 	app.Get("/", indexRoute)
 	app.Post("/create", addPerson)
 	app.Put("/update/:id", updatePerson)
 	app.Delete("/delete/:id", deletePerson)
+	app.Post("/assignment/:id", createAssignment)
+	app.Get("/assignments/:id", getAssignments)
 	app.Listen(":8000")
 }
